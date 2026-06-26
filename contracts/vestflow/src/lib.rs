@@ -1508,6 +1508,39 @@ mod test {
     }
 
     #[test]
+    fn test_revoked_schedule_claims_keep_vested_balance_claimable() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, grantor, beneficiary, token_addr, _) = setup(&env);
+        let token = TokenClient::new(&env, &token_addr);
+
+        set_time(&env, 0);
+        let id = client.create_schedule(
+            &grantor,
+            &beneficiary,
+            &token_addr,
+            &1000,
+            &0,
+            &1000,
+            &0,
+            &0,
+            &VestingKind::Linear,
+            &true,
+        );
+
+        set_time(&env, 250);
+        assert_eq!(client.claimable(&id), 250);
+
+        client.revoke(&id);
+        assert!(client.get_schedule(&id).revoked);
+        assert_eq!(client.claimable(&id), 250);
+
+        client.claim(&id);
+        assert_eq!(token.balance(&beneficiary), 250);
+        assert_eq!(client.claimable(&id), 0);
+    }
+
+    #[test]
     #[should_panic(expected = "Error(Contract, #4)")]
     fn test_cannot_claim_before_vesting_starts() {
         let env = Env::default();
